@@ -53,9 +53,10 @@ func (h Handler) Catch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	origin := r.Header.Get(h.originHeader)
-	if origin != "" {
-		level.Debug(h.logger).Log("msg", "request received from origin", "origin", origin)
-		h.counter.With(prometheus.Labels{"origin": origin}).Inc()
+	if origin == "" {
+		origin = "unknown"
 	}
+	level.Debug(h.logger).Log("msg", "request received from origin", "origin", origin)
+	h.counter.With(prometheus.Labels{"origin": origin}).Inc()
 	w.WriteHeader(http.StatusOK)
 }
