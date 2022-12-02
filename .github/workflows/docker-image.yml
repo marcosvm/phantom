@@ -22,8 +22,11 @@ jobs:
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: generate timestamp
+      id: timestamp
+      run: echo "::set-output name=date::$(date +'%s')"
     - name: Build and push
       uses: docker/build-push-action@v3
       with:
         push: true
-        tags: marcosvm/phantom:$(date +%s)
+        tags: marcosvm/phantom:${{ steps.date.outputs.date }}
