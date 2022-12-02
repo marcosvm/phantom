@@ -28,5 +28,9 @@ func main() {
 	http.HandleFunc("/", handler)
 
 	level.Info(logger).Log("msg", "starting listening to requests", "address", listenAddress)
-	http.ListenAndServe(*listenAddress, nil)
+	err := http.ListenAndServe(*listenAddress, nil)
+	if err != nil {
+		level.Error(logger).Log("msg", "error listening and serving", "error", err.Error())
+		os.Exit(1)
+	}
 }
