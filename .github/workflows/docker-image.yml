@@ -19,6 +19,7 @@ jobs:
           marcosvm/phantom
         tags: |
           type=raw,value={{sha}}
+          type=raw,value={{date 'X'}}
           type=raw,value=latest
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v2
