@@ -4,16 +4,19 @@ Phantom listens on a port and exposes prometheus metrics about requests being po
 
 The response will always be 200, the body content will be read and ignored.
 
-The service will record into a counter the contents of the `X-Forwarded-For` header as a label called `origin` if present otherwise it is ignored.
+The service will record into a counter the contents of the `X-Forwarded-For` header as labels called `origin` and `proxies` if available.
 
-The address to listen to, the header to be used as origin, er, origin and log levels are consigurable, see usage below.
+The address to listen to, the header to be used as origin and log levels are configurable, see usage below.
 
 ## Example
 ```
 # HELP metrics_posts_received_total The total number of received posts for metrics
 # TYPE metrics_posts_received_total counter
-metrics_posts_received_total{origin="10.0.0.1"} 83
-metrics_posts_received_total{origin="168.0.4.9"} 31
+# HELP metrics_posts_received_total The total number of received posts for metrics
+# TYPE metrics_posts_received_total counter
+metrics_posts_received_total{origin="1.2.3.4",proxies=""} 1
+metrics_posts_received_total{origin="1.2.3.4",proxies="5.6.7.8"} 1
+metrics_posts_received_total{origin="unknown",proxies=""} 1
 ```
 
 ## Usage

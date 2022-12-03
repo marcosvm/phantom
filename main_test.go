@@ -57,6 +57,7 @@ func TestEmptyBody(t *testing.T) {
 			Help: "The total number of received posts for metrics",
 		}, []string{
 			"origin",
+			"proxies",
 		}),
 	)
 
@@ -79,6 +80,7 @@ var (
 			Help: "The total number of received posts for metrics",
 		}, []string{
 			"origin",
+			"proxies",
 		}),
 	)
 )

@@ -3,6 +3,7 @@ package handler
 import (
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
@@ -27,6 +28,7 @@ func DefaultHandler(originHeader string, logger log.Logger) *Handler {
 			Help: "The total number of received posts for metrics",
 		}, []string{
 			"origin",
+			"proxies",
 		}),
 	}
 }
@@ -53,10 +55,20 @@ func (h Handler) Catch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	origin := r.Header.Get(h.originHeader)
-	if origin == "" {
-		origin = "unknown"
-	}
+	origin, proxies := h.extractOrigin(origin)
 	level.Debug(h.logger).Log("msg", "request received from origin", "origin", origin)
-	h.counter.With(prometheus.Labels{"origin": origin}).Inc()
+	h.counter.With(prometheus.Labels{"origin": origin, "proxies": proxies}).Inc()
 	w.WriteHeader(http.StatusOK)
+}
+
+func (h Handler) extractOrigin(origin string) (string, string) {
+	if origin == "" {
+		return "unknown", ""
+	}
+
+	parts := strings.SplitN(origin, ",", 2)
+	if len(parts) == 1 {
+		return parts[0], ""
+	}
+	return strings.Trim(parts[0], " "), strings.Trim(parts[1], " ")
 }
