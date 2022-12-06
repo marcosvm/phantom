@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -50,21 +52,43 @@ func (h Handler) Catch(w http.ResponseWriter, r *http.Request) {
 			r.Body.Close()
 		}
 	}()
-	buf, err := ioutil.ReadAll(r.Body)
+	var (
+		body []byte
+		err  error
+	)
+	body, err = ioutil.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		level.Error(h.logger).Log("msg", "error reading body", "error", err.Error())
+		level.Error(h.logger).Log("msg", "error reading compressed body", "error", err.Error())
 		return
+	}
+
+	if len(r.Header["Content-Encoding"]) > 0 && r.Header["Content-Encoding"][0] == "gzip" {
+		b, err := gzip.NewReader(ioutil.NopCloser(bytes.NewBuffer(body)))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			level.Error(h.logger).Log("msg", "error reading body", "error", err.Error())
+			return
+		}
+		defer b.Close()
+
+		body, err = ioutil.ReadAll(b)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			level.Error(h.logger).Log("msg", "error reading expanded body", "error", err.Error())
+			return
+		}
+
 	}
 	var paths []struct {
 		Path      string      `json:"path"`
 		Value     interface{} `json:"-"`
 		Timestamp interface{} `json:"-"`
 	}
-	err = json.Unmarshal(buf, &paths)
+	err = json.Unmarshal(body, &paths)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		level.Error(h.logger).Log("msg", "error decoding JSON", "error", err.Error(), "body", string(buf))
+		level.Error(h.logger).Log("msg", "error decoding JSON", "error", err.Error(), "body", string(body))
 		return
 	}
 	for _, p := range paths {
