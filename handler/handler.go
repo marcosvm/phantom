@@ -51,6 +51,11 @@ func (h Handler) Catch(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	buf, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		level.Error(h.logger).Log("msg", "error reading body", "error", err.Error())
+		return
+	}
 	var paths []struct {
 		Path      string      `json:"path"`
 		Value     interface{} `json:"-"`
@@ -59,6 +64,7 @@ func (h Handler) Catch(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(buf, &paths)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		level.Error(h.logger).Log("msg", "error decoding JSON", "error", err.Error(), "body", string(buf))
 		return
 	}
 	for _, p := range paths {
