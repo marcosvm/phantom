@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -49,7 +50,20 @@ func (h Handler) Catch(w http.ResponseWriter, r *http.Request) {
 			r.Body.Close()
 		}
 	}()
-	_, err := ioutil.ReadAll(r.Body)
+	buf, err := ioutil.ReadAll(r.Body)
+	var paths []struct {
+		Path      string      `json:"path"`
+		Value     interface{} `json:"-"`
+		Timestamp interface{} `json:"-"`
+	}
+	err = json.Unmarshal(buf, &paths)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	for _, p := range paths {
+		level.Info(h.logger).Log("msg", "metric path received", "path", p.Path)
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
