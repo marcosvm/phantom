@@ -32,6 +32,7 @@ func DefaultHandler(originHeader string, logger log.Logger) *Handler {
 		}, []string{
 			"origin",
 			"proxies",
+			"path",
 		}),
 	}
 }
@@ -91,17 +92,13 @@ func (h Handler) Catch(w http.ResponseWriter, r *http.Request) {
 		level.Error(h.logger).Log("msg", "error decoding JSON", "error", err.Error(), "body", string(body))
 		return
 	}
-	for _, p := range paths {
-		level.Info(h.logger).Log("msg", "metric path received", "path", p.Path)
-	}
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 	origin := r.Header.Get(h.originHeader)
 	origin, proxies := h.extractOrigin(origin)
-	level.Debug(h.logger).Log("msg", "request received from origin", "origin", origin)
-	h.counter.With(prometheus.Labels{"origin": origin, "proxies": proxies}).Inc()
+	level.Debug(h.logger).Log("msg", "request received from origin", "origin", origin, "proxies", proxies)
+	for _, p := range paths {
+		level.Debug(h.logger).Log("msg", "metric path received", "path", p.Path)
+		h.counter.With(prometheus.Labels{"origin": origin, "proxies": proxies, "path": p.Path}).Inc()
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
