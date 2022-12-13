@@ -4,6 +4,8 @@ import (
 	"flag"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/marcosvm/phantom/handler"
 
@@ -23,15 +25,31 @@ func main() {
 	logger = level.NewFilter(logger, level.Allow(level.ParseDefault(*logLevel, level.InfoValue())))
 	logger = log.With(logger, "ts", log.DefaultTimestampUTC)
 
-	http.Handle("/metrics", promhttp.Handler())
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGUSR1)
+	done := make(chan struct{}, 1)
 
-	handler := handler.DefaultHandler(*originHeader, logger, *debug).Catch
-	http.HandleFunc("/", handler)
+	http.Handle("/metrics", promhttp.Handler())
+	h := handler.DefaultHandler(*originHeader, logger, *debug)
+	http.HandleFunc("/", h.Catch)
+
+	go func() {
+		for {
+			select {
+			case <-sig:
+				h.FlipDebug()
+			case <-done:
+				return
+			}
+		}
+	}()
 
 	level.Info(logger).Log("msg", "starting listening to requests", "address", listenAddress)
 	err := http.ListenAndServe(*listenAddress, nil)
 	if err != nil {
 		level.Error(logger).Log("msg", "error listening and serving", "error", err.Error())
+		done <- struct{}{}
 		os.Exit(1)
 	}
+	done <- struct{}{}
 }

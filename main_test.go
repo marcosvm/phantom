@@ -58,6 +58,7 @@ func TestEmptyBody(t *testing.T) {
 		}, []string{
 			"origin",
 			"proxies",
+			"path",
 		},
 		),
 		false,
@@ -83,6 +84,7 @@ var (
 		}, []string{
 			"origin",
 			"proxies",
+			"path",
 		}),
 		false,
 	)

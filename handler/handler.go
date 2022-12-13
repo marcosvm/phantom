@@ -33,6 +33,7 @@ func DefaultHandler(originHeader string, logger log.Logger, debug bool) *Handler
 		}, []string{
 			"origin",
 			"proxies",
+			"path",
 		}),
 		debug: debug,
 	}
@@ -49,7 +50,7 @@ func NewHandler(originHeader string, logger log.Logger, counter *prometheus.Coun
 }
 
 // Catch handles all requests and increments the Prometheus counter with an origin label
-func (h Handler) Catch(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Catch(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if r.Body != nil {
 			r.Body.Close()
@@ -65,6 +66,10 @@ func (h Handler) Catch(w http.ResponseWriter, r *http.Request) {
 		level.Error(h.logger).Log("msg", "error reading compressed body", "error", err.Error())
 		return
 	}
+
+	origin := r.Header.Get(h.originHeader)
+	origin, proxies := h.extractOrigin(origin)
+	level.Debug(h.logger).Log("msg", "request received from origin", "origin", origin)
 
 	if h.debug {
 		if len(r.Header["Content-Encoding"]) > 0 && r.Header["Content-Encoding"][0] == "gzip" {
@@ -102,16 +107,15 @@ func (h Handler) Catch(w http.ResponseWriter, r *http.Request) {
 		}
 		for _, p := range paths {
 			level.Info(h.logger).Log("msg", "metric path received", "path", p.Path)
+			h.counter.With(prometheus.Labels{"origin": origin, "proxies": proxies, "path": p.Path}).Inc()
 		}
+	} else {
+		h.counter.With(prometheus.Labels{"origin": origin, "proxies": proxies, "path": ""}).Inc()
 	}
-	origin := r.Header.Get(h.originHeader)
-	origin, proxies := h.extractOrigin(origin)
-	level.Debug(h.logger).Log("msg", "request received from origin", "origin", origin)
-	h.counter.With(prometheus.Labels{"origin": origin, "proxies": proxies}).Inc()
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h Handler) extractOrigin(origin string) (string, string) {
+func (h *Handler) extractOrigin(origin string) (string, string) {
 	if origin == "" {
 		return "unknown", ""
 	}
@@ -121,4 +125,8 @@ func (h Handler) extractOrigin(origin string) (string, string) {
 		return parts[0], ""
 	}
 	return strings.Trim(parts[0], " "), strings.Trim(parts[1], " ")
+}
+
+func (h *Handler) FlipDebug() {
+	h.debug = !h.debug
 }
