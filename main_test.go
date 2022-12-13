@@ -16,7 +16,7 @@ import (
 
 func TestHandler(t *testing.T) {
 	jsonBody := `
-	[{
+	{
 		"path": "hosts.metric.uno",
 		"value": "33.441",
 		"timestamp": "1609746000"
@@ -30,7 +30,7 @@ func TestHandler(t *testing.T) {
 		"path": "hosts.metric.uno",
 		"value": "11341341414.3",
 		"timestamp": "1609746210"
-	}]
+	}
 	`
 
 	r := httptest.NewRecorder()
@@ -38,6 +38,29 @@ func TestHandler(t *testing.T) {
 	req.Header.Add("X-Forwarded-For", "10.1.1.1")
 
 	handler := handler.DefaultHandler("X-Forwarded-For", log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)))
+	handler.Catch(r, req)
+
+	if r.Result().StatusCode != 200 {
+		t.Errorf("failed to process request, expected 200 but got %d", r.Result().StatusCode)
+	}
+}
+
+func TestEmptyBody(t *testing.T) {
+	r := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/api/v2/graphite", nil)
+
+	handler := handler.NewHandler(
+		"X-Forwarded-For",
+		log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+		promauto.NewCounterVec(prometheus.CounterOpts{
+			Name: "metrics_posts_received_total_test_edition",
+			Help: "The total number of received posts for metrics",
+		}, []string{
+			"origin",
+			"proxies",
+		}),
+	)
+
 	handler.Catch(r, req)
 
 	if r.Result().StatusCode != 200 {
