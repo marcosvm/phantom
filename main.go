@@ -16,6 +16,7 @@ func main() {
 	listenAddress := flag.String("listen", ":7777", "ip:port for listening to web requests")
 	originHeader := flag.String("header", "X-Forwarded-For", "request address header")
 	logLevel := flag.String("log.level", "info", "debug, info, warn, error")
+	debug := flag.Bool("debug", false, "print path information")
 	flag.Parse()
 
 	logger := log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
@@ -24,7 +25,7 @@ func main() {
 
 	http.Handle("/metrics", promhttp.Handler())
 
-	handler := handler.DefaultHandler(*originHeader, logger).Catch
+	handler := handler.DefaultHandler(*originHeader, logger, *debug).Catch
 	http.HandleFunc("/", handler)
 
 	level.Info(logger).Log("msg", "starting listening to requests", "address", listenAddress)

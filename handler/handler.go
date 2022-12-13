@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 
@@ -19,10 +19,11 @@ type Handler struct {
 	originHeader string
 	logger       log.Logger
 	counter      *prometheus.CounterVec
+	debug        bool
 }
 
 // DefaultHandler returns a *Handler with default configuration
-func DefaultHandler(originHeader string, logger log.Logger) *Handler {
+func DefaultHandler(originHeader string, logger log.Logger, debug bool) *Handler {
 	return &Handler{
 		originHeader: originHeader,
 		logger:       logger,
@@ -33,15 +34,17 @@ func DefaultHandler(originHeader string, logger log.Logger) *Handler {
 			"origin",
 			"proxies",
 		}),
+		debug: debug,
 	}
 }
 
 // NewHandler returns a *Handler with custom parameters, useful for testing
-func NewHandler(originHeader string, logger log.Logger, counter *prometheus.CounterVec) *Handler {
+func NewHandler(originHeader string, logger log.Logger, counter *prometheus.CounterVec, debug bool) *Handler {
 	return &Handler{
 		originHeader: originHeader,
 		logger:       logger,
 		counter:      counter,
+		debug:        debug,
 	}
 }
 
@@ -56,47 +59,50 @@ func (h Handler) Catch(w http.ResponseWriter, r *http.Request) {
 		body []byte
 		err  error
 	)
-	body, err = ioutil.ReadAll(r.Body)
+	body, err = io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		level.Error(h.logger).Log("msg", "error reading compressed body", "error", err.Error())
 		return
 	}
 
-	if len(r.Header["Content-Encoding"]) > 0 && r.Header["Content-Encoding"][0] == "gzip" {
-		b, err := gzip.NewReader(ioutil.NopCloser(bytes.NewBuffer(body)))
+	if h.debug {
+		if len(r.Header["Content-Encoding"]) > 0 && r.Header["Content-Encoding"][0] == "gzip" {
+			b, err := gzip.NewReader(io.NopCloser(bytes.NewBuffer(body)))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				level.Error(h.logger).Log("msg", "error reading body", "error", err.Error())
+				return
+			}
+
+			body, err = io.ReadAll(b)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				level.Error(h.logger).Log("msg", "error reading expanded body", "error", err.Error())
+				return
+			}
+			err = b.Close()
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				level.Error(h.logger).Log("msg", "error reading expanded body", "error", err.Error())
+				return
+			}
+
+		}
+		var paths []struct {
+			Path      string      `json:"path"`
+			Value     interface{} `json:"-"`
+			Timestamp interface{} `json:"-"`
+		}
+		err = json.Unmarshal(body, &paths)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
-			level.Error(h.logger).Log("msg", "error reading body", "error", err.Error())
+			level.Error(h.logger).Log("msg", "error decoding JSON", "error", err.Error(), "body", string(body))
 			return
 		}
-		defer b.Close()
-
-		body, err = ioutil.ReadAll(b)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			level.Error(h.logger).Log("msg", "error reading expanded body", "error", err.Error())
-			return
+		for _, p := range paths {
+			level.Info(h.logger).Log("msg", "metric path received", "path", p.Path)
 		}
-
-	}
-	var paths []struct {
-		Path      string      `json:"path"`
-		Value     interface{} `json:"-"`
-		Timestamp interface{} `json:"-"`
-	}
-	err = json.Unmarshal(body, &paths)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		level.Error(h.logger).Log("msg", "error decoding JSON", "error", err.Error(), "body", string(body))
-		return
-	}
-	for _, p := range paths {
-		level.Info(h.logger).Log("msg", "metric path received", "path", p.Path)
-	}
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
 	}
 	origin := r.Header.Get(h.originHeader)
 	origin, proxies := h.extractOrigin(origin)

@@ -37,7 +37,7 @@ func TestHandler(t *testing.T) {
 	req := httptest.NewRequest("POST", "/api/v2/graphite", strings.NewReader(jsonBody))
 	req.Header.Add("X-Forwarded-For", "10.1.1.1")
 
-	handler := handler.DefaultHandler("X-Forwarded-For", log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)))
+	handler := handler.DefaultHandler("X-Forwarded-For", log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)), false)
 	handler.Catch(r, req)
 
 	if r.Result().StatusCode != 200 {
@@ -58,7 +58,9 @@ func TestEmptyBody(t *testing.T) {
 		}, []string{
 			"origin",
 			"proxies",
-		}),
+		},
+		),
+		false,
 	)
 
 	handler.Catch(r, req)
@@ -82,6 +84,7 @@ var (
 			"origin",
 			"proxies",
 		}),
+		false,
 	)
 )
 
