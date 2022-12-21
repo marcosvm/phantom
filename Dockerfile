@@ -8,5 +8,6 @@ COPY . ./
 RUN go build -o /phantom
 
 FROM golang:1-alpine
+COPY docker-entrypoint.sh /bin/docker-entrypoint.sh
 COPY --from=builder /phantom /phantom
-ENTRYPOINT ["/phantom"]
+CMD [ "/bin/docker-entrypoint.sh"]
