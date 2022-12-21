@@ -12,24 +12,43 @@ The address to listen to, the header to be used as origin and log levels are con
 ```
 # HELP metrics_posts_received_total The total number of received posts for metrics
 # TYPE metrics_posts_received_total counter
-# HELP metrics_posts_received_total The total number of received posts for metrics
-# TYPE metrics_posts_received_total counter
 metrics_posts_received_total{origin="1.2.3.4",proxies=""} 1
 metrics_posts_received_total{origin="1.2.3.4",proxies="5.6.7.8"} 1
 metrics_posts_received_total{origin="unknown",proxies=""} 1
+metrics_posts_received_total{origin="10.0.0.1",proxies="",path="hosts.10.0.0.1.cpu.idle"} 1
 ```
 
 ## Usage
 
 ```bash
-Usage of phantom:
+Usage of ./phantom:
+  -debug
+    	print path information
   -header string
     	request address header (default "X-Forwarded-For")
   -listen string
-        ip:port for listening to web requests (default ":7777")
+    	ip:port for listening to web requests (default ":7777")
   -log.level string
     	debug, info, warn, error (default "info")
 ```
+
+## Debugging
+
+It's useful to identify paths on this very specific use-case where the body of the request is posting JSON arrays.
+
+When Debugging is enabled the metric exposed will include a path label with parsed value from the request body for a JSON format of:
+```JSON
+[
+  { "path" : "a.path.for.metric",
+    "value" : <ignored>
+    "timestamp" : <ignored>
+  }
+]
+```
+
+
+To toggle debugging on and off send a `USR1` signal to the running process.
+
 
 ## Local Build
 
