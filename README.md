@@ -1,9 +1,3 @@
----
-title: README
-created: '2022-12-21T23:11:21.130Z'
-modified: '2022-12-21T23:27:49.011Z'
----
-
 # Phantom
 
 Phantom listens on a port and exposes prometheus metrics about requests being posted to it.
