@@ -1,9 +1,7 @@
 package handler
 
 import (
-	"bytes"
-	"compress/gzip"
-	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -57,62 +55,38 @@ func (h *Handler) Catch(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	var (
-		body []byte
-		err  error
+		err error
 	)
-	body, err = io.ReadAll(r.Body)
+	_, err = io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		level.Error(h.logger).Log("msg", "error reading compressed body", "error", err.Error())
 		return
 	}
 
-	origin := r.Header.Get(h.originHeader)
-	origin, proxies := h.extractOrigin(origin)
-	level.Debug(h.logger).Log("msg", "request received from origin", "origin", origin)
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, `{
+   "took": 30,
+   "errors": false,
+   "items": [
+      {
+         "index": {
+            "_index": "test",
+            "_id": "1",
+            "_version": 1,
+            "result": "created",
+            "_shards": {
+               "total": 2,
+               "successful": 1,
+               "failed": 0
+            },
+            "status": 201,
+            "_seq_no" : 0,
+            "_primary_term": 1
+         }
+      }]}
+`)
 
-	if h.debug {
-		if len(r.Header["Content-Encoding"]) > 0 && r.Header["Content-Encoding"][0] == "gzip" {
-			b, err := gzip.NewReader(io.NopCloser(bytes.NewBuffer(body)))
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				level.Error(h.logger).Log("msg", "error reading body", "error", err.Error())
-				return
-			}
-
-			body, err = io.ReadAll(b)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				level.Error(h.logger).Log("msg", "error reading expanded body", "error", err.Error())
-				return
-			}
-			err = b.Close()
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				level.Error(h.logger).Log("msg", "error reading expanded body", "error", err.Error())
-				return
-			}
-
-		}
-		var paths []struct {
-			Path      string      `json:"path"`
-			Value     interface{} `json:"-"`
-			Timestamp interface{} `json:"-"`
-		}
-		err = json.Unmarshal(body, &paths)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			level.Error(h.logger).Log("msg", "error decoding JSON", "error", err.Error(), "body", string(body))
-			return
-		}
-		for _, p := range paths {
-			level.Info(h.logger).Log("msg", "metric path received", "path", p.Path)
-			h.counter.With(prometheus.Labels{"origin": origin, "proxies": proxies, "path": p.Path}).Inc()
-		}
-	} else {
-		h.counter.With(prometheus.Labels{"origin": origin, "proxies": proxies, "path": ""}).Inc()
-	}
-	w.WriteHeader(http.StatusOK)
 }
 
 func (h *Handler) extractOrigin(origin string) (string, string) {
